@@ -1,124 +1,130 @@
+import requests
 import json
 import os
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
-
-import requests
-
-from src.vacancy import Vacancy
+import time
+from typing import List, Dict, Any, Optional
 
 
-class ApiClient(ABC):
-    """Абстрактный класс для работы с API сервиса с вакансиями"""
+class HTTPRequestHandler:
+    """Класс для обработки HTTP запросов"""
 
-    @abstractmethod
-    def get_vacancies(self, keyword: str) -> List[Dict]:
-        """Метод для получения вакансий от сервиса с вакансиями"""
-        pass
+    def __init__(self):
+        self._base_url = 'https://api.hh.ru/'
+        self._headers = {
+            'User-Agent': 'CW3/1.0 (aleksey.s.lozhkin@gmail.com.com)',
+            'Accept': 'application/json'
+        }
 
-
-class HeadHunterAPIClient(ApiClient):
-    """Класс для работы с API сервиса вакансий hh.ru"""
-
-    def __init__(self, base_url: str = 'https://api.hh.ru/vacancies'):
-        self.__base_url = base_url
-
-    def __request(self, params: Optional[Dict[str, Any]] = None) -> requests.Response:
-        """Приватный метод подключения к API"""
-
+    def make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Выполняет HTTP запрос и возвращает JSON"""
         if params is None:
             params = {}
 
-        response = requests.get(self.__base_url, params=params)
-
-        # Проверка статус-кода
-        if response.status_code == 200:
-            return response
-        elif response.status_code == 400:
-            raise requests.exceptions.HTTPError("Неверные параметры запроса")
-        elif response.status_code == 403:
-            raise requests.exceptions.HTTPError("Доступ запрещен")
-        elif response.status_code == 404:
-            raise requests.exceptions.HTTPError("Ресурс не найден")
-        elif response.status_code == 500:
-            raise requests.exceptions.HTTPError("Ошибка сервера")
-        else:
-            response.raise_for_status()
-
-        return response
-
-    def get_vacancies(self, keyword: str, area: int = 113, per_page: int = 30) -> List[Dict[str, Any]]:
-        """Метод для получения вакансий"""
-
-        params = {"text": keyword, "area": area, "per_page": per_page}
+        url = f"{self._base_url}{endpoint}"
 
         try:
-            response = self.__request(params)
-            print('Запрос успешно выполнен')
-            raw_data = response.json()
-            items = raw_data.get("items", [])
-            return items if isinstance(items, list) else []
-        except requests.exceptions.HTTPError as err:
-            print(f"Ошибка HTTP: {err}")
-            return []
+            response = requests.get(url, params=params, headers=self._headers)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            error_messages = {
+                400: "Неверные параметры запроса",
+                403: "Доступ запрещен",
+                404: "Ресурс не найден",
+                500: "Ошибка сервера"
+            }
+            status_code = e.response.status_code
+            message = error_messages.get(status_code, f"HTTP ошибка {status_code}")
+            print(f"{message}: {endpoint}")
+            raise
+        except requests.exceptions.RequestException as e:
+            print(f"Ошибка соединения: {e}")
+            raise
 
-    def get_vacancies_as_objects(self, keyword: str, area: int = 113, per_page: int = 30) -> List[Vacancy]:
-        """Метод для получения вакансий в виде объектов Vacancy"""
 
-        raw_data = self.get_vacancies(keyword, area, per_page)
-        return self._convert_vacancy(raw_data)
+class DataSaver:
+    """Класс для сохранения данных"""
 
     @staticmethod
-    def _convert_vacancy(raw_data: List[Dict[str, Any]]) -> List[Vacancy]:
-        """Преобразование списка словарей в список объектов Vacancy"""
+    def save_to_json(data: Any, filename: str) -> bool:
+        """Сохраняет данные в JSON файл"""
+        try:
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"Ошибка при сохранении данных: {e}")
+            return False
 
+
+class HeadHunterAPIClient:
+    """Основной класс для работы с API hh.ru"""
+
+    def __init__(self):
+        self._request_handler = HTTPRequestHandler()
+        self._data_saver = DataSaver()
+
+    def get_employer_info(self, employer_id: str) -> Optional[Dict[str, Any]]:
+        """Получение информации о компании по ID"""
+        try:
+            data = self._request_handler.make_request(f"employers/{employer_id}")
+            print(f'Данные компании {employer_id} успешно получены')
+            return data
+        except requests.exceptions.HTTPError:
+            return None
+
+    def get_employer_vacancies(self, employer_id: str, per_page: int = 100) -> List[Dict[str, Any]]:
+        """Получение вакансий компании с пагинацией"""
         vacancies = []
-        for item in raw_data:
-            title = item["name"]
-            url = item["alternate_url"]
-            salary = item.get("salary", {})  # Гарантируем dict
+        page = 0
+        pages = 1
 
-            # Обработка professional_roles
-            professional_roles = item.get("professional_roles", [])
-            description = professional_roles[0]["name"] if professional_roles else "Не указано"
+        while page < pages:
+            try:
+                params = {
+                    "employer_id": employer_id,
+                    "page": page,
+                    "per_page": per_page
+                }
 
-            # Обработка snippet
-            snippet = item.get("snippet", {})
-            responsibility = snippet.get("responsibility", "Не указано")
+                data = self._request_handler.make_request("vacancies", params)
+                vacancies.extend(data.get('items', []))
+                pages = data.get('pages', 1)
+                page += 1
 
-            # Обработка experience
-            experience = item.get("experience", {})
-            experience_name = experience.get("name", "Не указан")
+                time.sleep(0.2)
 
-            # Создание объекта Vacancy
-            vacancy = Vacancy(title, url, salary, description, responsibility, experience_name)
-            vacancies.append(vacancy)
+            except requests.exceptions.HTTPError:
+                break
 
         return vacancies
 
-    def save_vacancies_to_json(self, keyword: str, filename: Optional[str] = None, **kwargs) -> bool:
-        """Получает вакансии и сразу сохраняет их в JSON файл"""
+    def get_companies_data(self, company_ids: List[str]) -> List[Dict[str, Any]]:
+        """Получение полных данных по списку компаний"""
+        companies_data = []
 
-        # Если имя файла не указано, используем путь по умолчанию
-        if filename is None:
-            filename = 'data/raw_json.json'
+        for company_id in company_ids:
+            print(f"Сбор данных для компании {company_id}...")
 
-        # Создаем директорию, если она не существует
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
+            employer_info = self.get_employer_info(company_id)
 
-        try:
-            # Получаем вакансии
-            vacancies = self.get_vacancies(keyword, **kwargs)
+            if employer_info:
+                vacancies = self.get_employer_vacancies(company_id)
 
-            # Проверяем, что мы получили данные
-            if not vacancies:
-                print("Не получено данных для сохранения")
-                return False
+                company_data = {
+                    'employer': employer_info,
+                    'vacancies': vacancies,
+                    'vacancies_count': len(vacancies)
+                }
 
-            with open(filename, 'w', encoding='utf-8') as raw_json:
-                json.dump(vacancies, raw_json, ensure_ascii=False, indent=2)
-            print(f"Успешно сохранено {len(vacancies)} вакансий в {filename}")
-            return True
-        except Exception as err:
-            print(f"Ошибка при сохранении вакансий: {err}")
-            return False
+                companies_data.append(company_data)
+                print(f"Получено {len(vacancies)} вакансий для компании {employer_info.get('name', 'Unknown')}")
+
+            time.sleep(1)
+
+        return companies_data
+
+    def save_companies_data(self, companies_data: List[Dict[str, Any]], filename: str) -> bool:
+        """Сохраняет данные компаний"""
+        return self._data_saver.save_to_json(companies_data, filename)
