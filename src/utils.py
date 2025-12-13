@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional, Union, cast
 
 from src.api_client import HeadHunterAPIClient
 from src.config import DatabaseConfig
@@ -15,15 +15,15 @@ def collect_data_from_hh() -> Optional[str]:
 
     target_companies = [
         '15478',  # VK
-        '3529',   # Сбер
-        '1740',   # Яндекс
+        '3529',  # Сбер
+        '1740',  # Яндекс
         '78638',  # Тинькофф
-        '4181',   # Газпром нефть
-        '3776',   # МТС
+        '4181',  # Газпром нефть
+        '3776',  # МТС
         '39305',  # Ozon
         '87021',  # Wildberries
-        '2180',   # Ростелеком
-        '64174'   # 1С
+        '2180',  # Ростелеком
+        '64174',  # 1С
     ]
 
     print(f"Сбор данных по {len(target_companies)} компаниям...")
@@ -31,36 +31,38 @@ def collect_data_from_hh() -> Optional[str]:
         companies_data = hh_client.get_companies_data(target_companies)
 
         # Преобразуем структуру данных в нужный формат
-        formatted_data = {
+        formatted_data: Dict[str, Any] = {
             'employers': [],
             'vacancies': [],
-            'metadata': {
-                'total_companies': len(target_companies),
-                'saved_at': '2024-01-01 00:00:00'
-            }
+            'metadata': {'total_companies': len(target_companies), 'saved_at': '2024-01-01 00:00:00'},
         }
+
+        # Приводим типы для корректной работы mypy
+        employers_list = cast(List[Dict[str, Any]], formatted_data['employers'])
+        vacancies_list = cast(List[Dict[str, Any]], formatted_data['vacancies'])
 
         for company_data in companies_data:
             # Добавляем работодателя
             employer = company_data.get('employer')
             if employer:
-                formatted_data['employers'].append(employer)
+                employers_list.append(employer)
 
             # Добавляем вакансии
             vacancies = company_data.get('vacancies', [])
             if vacancies:
-                formatted_data['vacancies'].extend(vacancies)
+                vacancies_list.extend(vacancies)
 
         # Сохраняем данные
         output_file = 'data/hh_data.json'
         os.makedirs('data', exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
             import json
+
             json.dump(formatted_data, f, ensure_ascii=False, indent=2)
 
         print(f"✓ Данные успешно сохранены в файл: {output_file}")
-        print(f"   Найдено: {len(formatted_data['employers'])} работодателей")
-        print(f"   Найдено: {len(formatted_data['vacancies'])} вакансий")
+        print(f"   Найдено: {len(employers_list)} работодателей")
+        print(f"   Найдено: {len(vacancies_list)} вакансий")
 
         return output_file
     except Exception as e:
@@ -139,7 +141,9 @@ def load_data_to_database(json_file: str) -> bool:
         if stats['employers_loaded'] < stats['employers_total']:
             print(f"\n⚠  Пропущено работодателей: {stats['employers_total'] - stats['employers_loaded']} (дубликаты)")
         if stats['vacancies_loaded'] < stats['vacancies_total']:
-            print(f"⚠  Пропущено вакансий: {stats['vacancies_total'] - stats['vacancies_loaded']} (дубликаты или ошибки)")
+            print(
+                f"⚠  Пропущено вакансий: {stats['vacancies_total'] - stats['vacancies_loaded']} (дубликаты или ошибки)"
+            )
 
         print(f"\n✓ Данные успешно загружены в базу данных '{config.dbname}'")
         return True
@@ -158,7 +162,7 @@ def load_data_to_database(json_file: str) -> bool:
         try:
             if 'db_manager' in locals():
                 db_manager.close()
-        except:
+        except Exception:
             pass
 
 

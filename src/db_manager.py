@@ -1,8 +1,10 @@
-import psycopg2
-from psycopg2.extensions import connection, ISOLATION_LEVEL_AUTOCOMMIT
-from src.config import DatabaseConfig
-from typing import Optional, List, Dict, Any
 import json
+from typing import Any, Dict, Optional
+
+import psycopg2
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, connection
+
+from src.config import DatabaseConfig
 
 
 class DatabaseCreator:
@@ -22,7 +24,7 @@ class DatabaseCreator:
                 password=self.config.password,
                 host=self.config.host,
                 port=self.config.port,
-                database='postgres'  # Подключаемся к стандартной БД
+                database='postgres',  # Подключаемся к стандартной БД
             )
             conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
             cursor = conn.cursor()
@@ -64,14 +66,13 @@ class DatabaseConnection:
         """Устанавливает соединение"""
         if not self._connection or self._connection.closed:
             try:
-                connection_params = {
-                    'user': self.config.user,
-                    'password': self.config.password,
-                    'host': self.config.host,
-                    'port': self.config.port,
-                    'database': self.config.dbname  # Используем имя базы данных из конфигурации
-                }
-                self._connection = psycopg2.connect(**connection_params)
+                self._connection = psycopg2.connect(
+                    user=self.config.user,
+                    password=self.config.password,
+                    host=self.config.host,
+                    port=self.config.port,
+                    database=self.config.dbname,
+                )
                 self._connection.autocommit = True
                 print(f"✓ Успешное подключение к базе данных '{self.config.dbname}'")
             except psycopg2.OperationalError as e:
@@ -101,7 +102,8 @@ class DatabaseSchemaManager:
     def create_employers_table(self):
         """Создание таблицы employers"""
         with self.connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS employers (
                     id SERIAL PRIMARY KEY,
                     employer_id INTEGER UNIQUE NOT NULL,
@@ -113,14 +115,16 @@ class DatabaseSchemaManager:
                     area JSONB,
                     industries JSONB
                 )
-            """)
+            """
+            )
         self.connection.commit()
         print("✓ Таблица 'employers' создана или уже существует")
 
     def create_vacancies_table(self):
         """Создание таблицы vacancies"""
         with self.connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS vacancies (
                     id SERIAL PRIMARY KEY,
                     vacancy_id INTEGER UNIQUE NOT NULL,
@@ -139,7 +143,8 @@ class DatabaseSchemaManager:
                     experience VARCHAR(100),
                     alternate_url VARCHAR(500)
                 )
-            """)
+            """
+            )
         self.connection.commit()
         print("✓ Таблица 'vacancies' создана или уже существует")
 
@@ -179,16 +184,19 @@ class DatabaseManager:
 
         with self.connection.cursor() as cursor:
             try:
-                cursor.execute(query, (
-                    employer_data.get('id'),
-                    employer_data.get('name'),
-                    employer_data.get('description'),
-                    employer_data.get('site_url'),
-                    employer_data.get('alternate_url'),
-                    json.dumps(employer_data.get('logo_urls')) if employer_data.get('logo_urls') else None,
-                    json.dumps(employer_data.get('area')) if employer_data.get('area') else None,
-                    json.dumps(employer_data.get('industries')) if employer_data.get('industries') else None
-                ))
+                cursor.execute(
+                    query,
+                    (
+                        employer_data.get('id'),
+                        employer_data.get('name'),
+                        employer_data.get('description'),
+                        employer_data.get('site_url'),
+                        employer_data.get('alternate_url'),
+                        json.dumps(employer_data.get('logo_urls')) if employer_data.get('logo_urls') else None,
+                        json.dumps(employer_data.get('area')) if employer_data.get('area') else None,
+                        json.dumps(employer_data.get('industries')) if employer_data.get('industries') else None,
+                    ),
+                )
                 result = cursor.fetchone()
                 return result[0] if result else None
             except Exception as e:
@@ -228,23 +236,26 @@ class DatabaseManager:
 
         with self.connection.cursor() as cursor:
             try:
-                cursor.execute(query, (
-                    vacancy_data.get('id'),
-                    employer_id,
-                    vacancy_data.get('name'),
-                    salary_from,
-                    salary_to,
-                    salary_currency,
-                    salary_gross,
-                    json.dumps(vacancy_data.get('area')) if vacancy_data.get('area') else None,
-                    published_at,
-                    created_at,
-                    vacancy_data.get('requirement'),
-                    vacancy_data.get('responsibility'),
-                    employment.get('name') if employment else None,
-                    experience.get('name') if experience else None,
-                    vacancy_data.get('alternate_url')
-                ))
+                cursor.execute(
+                    query,
+                    (
+                        vacancy_data.get('id'),
+                        employer_id,
+                        vacancy_data.get('name'),
+                        salary_from,
+                        salary_to,
+                        salary_currency,
+                        salary_gross,
+                        json.dumps(vacancy_data.get('area')) if vacancy_data.get('area') else None,
+                        published_at,
+                        created_at,
+                        vacancy_data.get('requirement'),
+                        vacancy_data.get('responsibility'),
+                        employment.get('name') if employment else None,
+                        experience.get('name') if experience else None,
+                        vacancy_data.get('alternate_url'),
+                    ),
+                )
                 result = cursor.fetchone()
                 return result[0] if result else None
             except Exception as e:
@@ -260,7 +271,7 @@ class DatabaseManager:
             'employers_loaded': 0,
             'vacancies_loaded': 0,
             'employers_total': len(employers),
-            'vacancies_total': len(vacancies)
+            'vacancies_total': len(vacancies),
         }
 
         print(f"Начинаю загрузку {len(employers)} работодателей и {len(vacancies)} вакансий...")

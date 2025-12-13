@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from typing import Optional
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,31 +10,32 @@ load_dotenv()
 @dataclass(frozen=True)
 class DatabaseConfig:
     """Конфигурация подключения к базе данных"""
+
     dbname: str
     user: str
     password: str
-    host: str = 'localhost'
+    host: str = "localhost"
     port: int = 5432
 
     @classmethod
-    def from_env(cls) -> Optional['DatabaseConfig']:
+    def from_env(cls) -> Optional["DatabaseConfig"]:
         """
         Создает конфигурацию из переменных окружения.
         """
         # Чтение обязательных параметров
-        dbname = os.getenv('DB_NAME')
-        user = os.getenv('DB_USER')
-        password = os.getenv('DB_PASSWORD')
+        dbname = os.getenv("DB_NAME")
+        user = os.getenv("DB_USER")
+        password = os.getenv("DB_PASSWORD")
 
         # Проверяем наличие всех обязательных полей
-        if not all([dbname, user, password]):
+        if not dbname or not user or not password:
             print("Ошибка: Отсутствуют обязательные параметры БД в .env файле")
             print("Проверьте наличие DB_NAME, DB_USER, DB_PASSWORD")
             return None
 
         # Чтение опциональных параметров со значениями по умолчанию
-        host = os.getenv('DB_HOST', 'localhost')
-        port_str = os.getenv('DB_PORT', '5432')
+        host = os.getenv("DB_HOST", "localhost")
+        port_str = os.getenv("DB_PORT", "5432")
 
         try:
             port = int(port_str)
@@ -46,7 +48,7 @@ class DatabaseConfig:
             user=user,
             password=password,
             host=host,
-            port=port
+            port=port,
         )
 
     def validate(self) -> bool:

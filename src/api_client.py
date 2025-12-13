@@ -2,7 +2,7 @@ import requests
 import json
 import os
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union, cast
 
 
 class HTTPRequestHandler:
@@ -15,7 +15,7 @@ class HTTPRequestHandler:
             'Accept': 'application/json'
         }
 
-    def make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """Выполняет HTTP запрос и возвращает JSON"""
         if params is None:
             params = {}
@@ -25,7 +25,7 @@ class HTTPRequestHandler:
         try:
             response = requests.get(url, params=params, headers=self.__headers)
             response.raise_for_status()
-            return response.json()
+            return cast(Union[Dict[str, Any], List[Dict[str, Any]]], response.json())
         except requests.exceptions.HTTPError as e:
             error_messages = {
                 400: "Неверные параметры запроса",
@@ -52,12 +52,31 @@ class DataSaver:
     def save_to_json(self, data: Any, filename: str) -> bool:
         """Сохраняет данные в JSON файл"""
         try:
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            # Создаем директорию, если она не существует
+            directory = os.path.dirname(filename)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+
+            # Сохраняем данные в файл
             with open(filename, 'w', encoding=self.__default_encoding) as f:
                 json.dump(data, f, ensure_ascii=False, indent=self.__indent)
-            return True
+
+            # Проверяем, что файл был создан
+            if os.path.exists(filename):
+                print(f"✓ Файл успешно сохранен: {filename}")
+                return True
+            else:
+                print(f"✗ Не удалось создать файл: {filename}")
+                return False
+
+        except (TypeError, ValueError) as e:
+            print(f"Ошибка кодирования JSON: {e}")
+            return False
+        except OSError as e:
+            print(f"Ошибка файловой системы: {e}")
+            return False
         except Exception as e:
-            print(f"Ошибка при сохранении данных: {e}")
+            print(f"Неизвестная ошибка при сохранении данных: {e}")
             return False
 
 
@@ -72,14 +91,16 @@ class HeadHunterAPIClient:
         """Получение информации о компании по ID"""
         try:
             data = self._request_handler.make_request(f"employers/{employer_id}")
-            print(f'Данные компании {employer_id} успешно получены')
-            return data
+            if isinstance(data, dict):
+                print(f'✓ Данные компании {employer_id} успешно получены')
+                return cast(Dict[str, Any], data)
+            return None
         except requests.exceptions.HTTPError:
             return None
 
     def get_employer_vacancies(self, employer_id: str, per_page: int = 100) -> List[Dict[str, Any]]:
         """Получение вакансий компании"""
-        vacancies = []
+        vacancies: List[Dict[str, Any]] = []
         page = 0
         pages = 1
 
@@ -92,9 +113,13 @@ class HeadHunterAPIClient:
                 }
 
                 data = self._request_handler.make_request("vacancies", params)
-                vacancies.extend(data.get('items', []))
-                pages = data.get('pages', 1)
-                page += 1
+                if isinstance(data, dict) and 'items' in data:
+                    items = cast(List[Dict[str, Any]], data.get('items', []))
+                    vacancies.extend(items)
+                    pages = data.get('pages', 1)
+                    page += 1
+                else:
+                    break
 
                 time.sleep(0.2)
 
@@ -105,7 +130,7 @@ class HeadHunterAPIClient:
 
     def get_companies_data(self, company_ids: List[str]) -> List[Dict[str, Any]]:
         """Получение полных данных по списку компаний"""
-        companies_data = []
+        companies_data: List[Dict[str, Any]] = []
 
         for company_id in company_ids:
             print(f"Сбор данных для компании {company_id}...")
@@ -115,7 +140,7 @@ class HeadHunterAPIClient:
             if employer_info:
                 vacancies = self.get_employer_vacancies(company_id)
 
-                company_data = {
+                company_data: Dict[str, Any] = {
                     'employer': employer_info,
                     'vacancies': vacancies,
                     'vacancies_count': len(vacancies)
@@ -129,13 +154,12 @@ class HeadHunterAPIClient:
         return companies_data
 
     def save_companies_data(self, companies_data: List[Dict[str, Any]], filename: str) -> bool:
-        """Сохраняет данные компаний"""
-
+        """Сохраняет данные компаний в файл"""
         print(f"Сохранение данных в файл: {filename}")
 
         # Собираем всех работодателей и вакансии
-        all_employers = []
-        all_vacancies = []
+        all_employers: List[Dict[str, Any]] = []
+        all_vacancies: List[Dict[str, Any]] = []
 
         for company in companies_data:
             employer = company.get('employer')
@@ -147,7 +171,7 @@ class HeadHunterAPIClient:
                 all_vacancies.extend(vacancies)
 
         # Создаем структуру данных
-        data_to_save = {
+        data_to_save: Dict[str, Any] = {
             'employers': all_employers,
             'vacancies': all_vacancies,
             'metadata': {
@@ -160,5 +184,6 @@ class HeadHunterAPIClient:
 
         print(f"Сохранено: {len(all_employers)} работодателей, {len(all_vacancies)} вакансий")
 
-        return self._data_saver.save_to_json(data_to_save, filename)
+        result: bool = self._data_saver.save_to_json(data_to_save, filename)
+        return result
 

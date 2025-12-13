@@ -1,6 +1,8 @@
+from typing import Any, Dict, List, Optional
+
 import psycopg2
+
 from src.config import DatabaseConfig
-from typing import List, Dict, Any, Optional
 
 
 class DBManager:
@@ -19,7 +21,7 @@ class DBManager:
                 port=self.config.port,
                 database=self.config.dbname,
                 user=self.config.user,
-                password=self.config.password
+                password=self.config.password,
             )
         return self._connection
 
@@ -41,7 +43,7 @@ class DBManager:
     def get_companies_and_vacancies_count(self) -> List[Dict[str, Any]]:
         """Получает список всех компаний и количество вакансий у каждой компании."""
         query = """
-            SELECT 
+            SELECT
                 e.name as company_name,
                 COUNT(v.id) as vacancies_count
             FROM employers e
@@ -69,7 +71,7 @@ class DBManager:
         """Получает список всех вакансий с указанием названия компании,
         названия вакансии, зарплаты и ссылки на вакансию."""
         query = """
-            SELECT 
+            SELECT
                 e.name as company_name,
                 v.name as vacancy_name,
                 v.salary_from,
@@ -99,10 +101,10 @@ class DBManager:
     def get_avg_salary(self) -> Optional[float]:
         """Получает среднюю зарплату по вакансиям."""
         query = """
-            SELECT 
+            SELECT
                 AVG(
-                    CASE 
-                        WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL 
+                    CASE
+                        WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL
                             THEN (salary_from + salary_to) / 2.0
                         WHEN salary_from IS NOT NULL THEN salary_from
                         WHEN salary_to IS NOT NULL THEN salary_to
@@ -134,15 +136,15 @@ class DBManager:
             return []
 
         query = """
-            SELECT 
+            SELECT
                 e.name as company_name,
                 v.name as vacancy_name,
                 v.salary_from,
                 v.salary_to,
                 v.salary_currency,
                 v.alternate_url as vacancy_url,
-                CASE 
-                    WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL 
+                CASE
+                    WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL
                         THEN (salary_from + salary_to) / 2.0
                     WHEN salary_from IS NOT NULL THEN salary_from
                     WHEN salary_to IS NOT NULL THEN salary_to
@@ -179,7 +181,7 @@ class DBManager:
     def get_vacancies_with_keyword(self, keyword: str) -> List[Dict[str, Any]]:
         """Получает список всех вакансий, в названии которых содержатся переданные слова."""
         query = """
-            SELECT 
+            SELECT
                 e.name as company_name,
                 v.name as vacancy_name,
                 v.salary_from,
@@ -216,7 +218,7 @@ class DBManager:
     def get_vacancies_by_company(self, company_id: int) -> List[Dict[str, Any]]:
         """Получает все вакансии конкретной компании."""
         query = """
-            SELECT 
+            SELECT
                 v.name as vacancy_name,
                 v.salary_from,
                 v.salary_to,
@@ -247,7 +249,7 @@ class DBManager:
     def get_top_companies_by_vacancies(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Получает компании с наибольшим количеством вакансий."""
         query = """
-            SELECT 
+            SELECT
                 e.name as company_name,
                 COUNT(v.id) as vacancies_count,
                 e.alternate_url as company_url
@@ -276,13 +278,13 @@ class DBManager:
     def get_salary_statistics(self) -> Dict[str, Any]:
         """Получает статистику по зарплатам."""
         query = """
-            SELECT 
+            SELECT
                 COUNT(*) as total_vacancies,
-                COUNT(CASE WHEN salary_from IS NOT NULL OR salary_to IS NOT NULL 
+                COUNT(CASE WHEN salary_from IS NOT NULL OR salary_to IS NOT NULL
                            THEN 1 END) as vacancies_with_salary,
                 AVG(
-                    CASE 
-                        WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL 
+                    CASE
+                        WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL
                             THEN (salary_from + salary_to) / 2.0
                         WHEN salary_from IS NOT NULL THEN salary_from
                         WHEN salary_to IS NOT NULL THEN salary_to
@@ -290,8 +292,8 @@ class DBManager:
                     END
                 ) as avg_salary,
                 MIN(
-                    CASE 
-                        WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL 
+                    CASE
+                        WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL
                             THEN (salary_from + salary_to) / 2.0
                         WHEN salary_from IS NOT NULL THEN salary_from
                         WHEN salary_to IS NOT NULL THEN salary_to
@@ -299,8 +301,8 @@ class DBManager:
                     END
                 ) as min_salary,
                 MAX(
-                    CASE 
-                        WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL 
+                    CASE
+                        WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL
                             THEN (salary_from + salary_to) / 2.0
                         WHEN salary_from IS NOT NULL THEN salary_from
                         WHEN salary_to IS NOT NULL THEN salary_to
