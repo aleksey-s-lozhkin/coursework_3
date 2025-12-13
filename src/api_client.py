@@ -130,4 +130,35 @@ class HeadHunterAPIClient:
 
     def save_companies_data(self, companies_data: List[Dict[str, Any]], filename: str) -> bool:
         """Сохраняет данные компаний"""
-        return self._data_saver.save_to_json(companies_data, filename)
+
+        print(f"Сохранение данных в файл: {filename}")
+
+        # Собираем всех работодателей и вакансии
+        all_employers = []
+        all_vacancies = []
+
+        for company in companies_data:
+            employer = company.get('employer')
+            if employer:
+                all_employers.append(employer)
+
+            vacancies = company.get('vacancies', [])
+            if vacancies:
+                all_vacancies.extend(vacancies)
+
+        # Создаем структуру данных
+        data_to_save = {
+            'employers': all_employers,
+            'vacancies': all_vacancies,
+            'metadata': {
+                'total_companies': len(companies_data),
+                'total_employers': len(all_employers),
+                'total_vacancies': len(all_vacancies),
+                'saved_at': time.strftime('%Y-%m-%d %H:%M:%S')
+            }
+        }
+
+        print(f"Сохранено: {len(all_employers)} работодателей, {len(all_vacancies)} вакансий")
+
+        return self._data_saver.save_to_json(data_to_save, filename)
+

@@ -23,8 +23,10 @@ class JSONDataSource(DataSource):
 
     def get_employers(self) -> List[Dict[str, Any]]:
         with open(self.filepath, 'r', encoding='utf-8') as f:
-            return json.load(f).get('employers', [])
+            data = json.load(f)
+            return data.get('employers', [])
 
     def get_vacancies(self) -> List[Dict[str, Any]]:
         with open(self.filepath, 'r', encoding='utf-8') as f:
-            return json.load(f).get('vacancies', [])
+            data = json.load(f)
+            return data.get('vacancies', [])

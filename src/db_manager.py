@@ -1,8 +1,56 @@
 import psycopg2
-from psycopg2.extensions import connection
+from psycopg2.extensions import connection, ISOLATION_LEVEL_AUTOCOMMIT
 from src.config import DatabaseConfig
 from typing import Optional, List, Dict, Any
 import json
+
+
+class DatabaseCreator:
+    """Класс для создания базы данных"""
+
+    def __init__(self, config: DatabaseConfig):
+        self.config = config
+
+    def create_database_if_not_exists(self) -> bool:
+        """Создает базу данных если она не существует"""
+        try:
+            print(f"Проверка существования базы данных '{self.config.dbname}'...")
+
+            # Подключаемся к стандартной базе данных postgres
+            conn = psycopg2.connect(
+                user=self.config.user,
+                password=self.config.password,
+                host=self.config.host,
+                port=self.config.port,
+                database='postgres'  # Подключаемся к стандартной БД
+            )
+            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            cursor = conn.cursor()
+
+            # Проверяем существование базы данных
+            cursor.execute(f"SELECT 1 FROM pg_database WHERE datname = '{self.config.dbname}'")
+            exists = cursor.fetchone()
+
+            if not exists:
+                print(f"Создание базы данных '{self.config.dbname}'...")
+                cursor.execute(f"CREATE DATABASE {self.config.dbname}")
+                print(f"✓ База данных '{self.config.dbname}' успешно создана")
+                created = True
+            else:
+                print(f"✓ База данных '{self.config.dbname}' уже существует")
+                created = False
+
+            cursor.close()
+            conn.close()
+            return created
+
+        except psycopg2.OperationalError as e:
+            print(f"✗ Ошибка подключения к PostgreSQL: {e}")
+            print("Убедитесь, что PostgreSQL запущен и доступен")
+            raise
+        except Exception as e:
+            print(f"✗ Ошибка при создании базы данных: {e}")
+            raise
 
 
 class DatabaseConnection:
@@ -15,14 +63,27 @@ class DatabaseConnection:
     def connect(self) -> connection:
         """Устанавливает соединение"""
         if not self._connection or self._connection.closed:
-            self._connection = psycopg2.connect(**self.config.__dict__)
-            self._connection.autocommit = True
+            try:
+                connection_params = {
+                    'user': self.config.user,
+                    'password': self.config.password,
+                    'host': self.config.host,
+                    'port': self.config.port,
+                    'database': self.config.dbname  # Используем имя базы данных из конфигурации
+                }
+                self._connection = psycopg2.connect(**connection_params)
+                self._connection.autocommit = True
+                print(f"✓ Успешное подключение к базе данных '{self.config.dbname}'")
+            except psycopg2.OperationalError as e:
+                print(f"✗ Ошибка подключения к базе данных '{self.config.dbname}': {e}")
+                raise
         return self._connection
 
     def disconnect(self):
         """Закрывает соединение"""
         if self._connection and not self._connection.closed:
             self._connection.close()
+            print("✓ Соединение с БД закрыто")
 
 
 class DatabaseSchemaManager:
@@ -33,6 +94,7 @@ class DatabaseSchemaManager:
 
     def create_tables(self):
         """Создание всех необходимых таблиц"""
+        print("Создание таблиц в базе данных...")
         self.create_employers_table()
         self.create_vacancies_table()
 
@@ -53,7 +115,7 @@ class DatabaseSchemaManager:
                 )
             """)
         self.connection.commit()
-        print("Таблица 'employers' создана или уже существует")
+        print("✓ Таблица 'employers' создана или уже существует")
 
     def create_vacancies_table(self):
         """Создание таблицы vacancies"""
@@ -79,24 +141,30 @@ class DatabaseSchemaManager:
                 )
             """)
         self.connection.commit()
-        print("Таблица 'vacancies' создана или уже существует")
-
-    def drop_tables(self):
-        """Удаление таблиц (для очистки)"""
-        with self.connection.cursor() as cursor:
-            cursor.execute("DROP TABLE IF EXISTS vacancies CASCADE")
-            cursor.execute("DROP TABLE IF EXISTS employers CASCADE")
-        self.connection.commit()
-        print("Таблицы удалены")
+        print("✓ Таблица 'vacancies' создана или уже существует")
 
 
 class DatabaseManager:
     """Основной менеджер для работы с БД"""
 
     def __init__(self, config: DatabaseConfig):
+        self.config = config
+
+        # 1. Создаем базу данных если она не существует
+        print("\n[1/3] Проверка и создание базы данных...")
+        db_creator = DatabaseCreator(config)
+        db_creator.create_database_if_not_exists()
+
+        # 2. Подключаемся к базе данных
+        print("[2/3] Подключение к базе данных...")
         self.connection_manager = DatabaseConnection(config)
         self.connection = self.connection_manager.connect()
+
+        # 3. Инициализируем менеджер схемы
+        print("[3/3] Инициализация менеджера схемы...")
         self.schema_manager = DatabaseSchemaManager(self.connection)
+
+        print("DatabaseManager успешно инициализирован\n")
 
     def insert_employer(self, employer_data: Dict[str, Any]) -> Optional[int]:
         """Добавление работодателя в БД"""
