@@ -36,10 +36,10 @@ class DatabaseCreator:
             if not exists:
                 print(f"Создание базы данных '{self.config.dbname}'...")
                 cursor.execute(f"CREATE DATABASE {self.config.dbname}")
-                print(f"✓ База данных '{self.config.dbname}' успешно создана")
+                print(f"База данных '{self.config.dbname}' успешно создана")
                 created = True
             else:
-                print(f"✓ База данных '{self.config.dbname}' уже существует")
+                print(f"База данных '{self.config.dbname}' уже существует")
                 created = False
 
             cursor.close()
@@ -47,11 +47,11 @@ class DatabaseCreator:
             return created
 
         except psycopg2.OperationalError as e:
-            print(f"✗ Ошибка подключения к PostgreSQL: {e}")
+            print(f"Ошибка подключения к PostgreSQL: {e}")
             print("Убедитесь, что PostgreSQL запущен и доступен")
             raise
         except Exception as e:
-            print(f"✗ Ошибка при создании базы данных: {e}")
+            print(f"Ошибка при создании базы данных: {e}")
             raise
 
 
@@ -84,7 +84,7 @@ class DatabaseConnection:
         """Закрывает соединение"""
         if self._connection and not self._connection.closed:
             self._connection.close()
-            print("✓ Соединение с БД закрыто")
+            print("Соединение с БД закрыто")
 
 
 class DatabaseSchemaManager:
@@ -128,7 +128,7 @@ class DatabaseSchemaManager:
                 CREATE TABLE IF NOT EXISTS vacancies (
                     id SERIAL PRIMARY KEY,
                     vacancy_id INTEGER UNIQUE NOT NULL,
-                    employer_id INTEGER REFERENCES employers(employer_id),
+                    employer_id INTEGER NOT NULL,
                     name VARCHAR(255) NOT NULL,
                     salary_from INTEGER,
                     salary_to INTEGER,
@@ -141,7 +141,11 @@ class DatabaseSchemaManager:
                     responsibility TEXT,
                     employment VARCHAR(100),
                     experience VARCHAR(100),
-                    alternate_url VARCHAR(500)
+                    alternate_url VARCHAR(500),
+                    CONSTRAINT fk_vacancies_employer
+                        FOREIGN KEY (employer_id)
+                        REFERENCES employers(employer_id)
+                        ON DELETE CASCADE
                 )
             """
             )
@@ -165,9 +169,10 @@ class DatabaseManager:
         self.connection_manager = DatabaseConnection(config)
         self.connection = self.connection_manager.connect()
 
-        # 3. Инициализируем менеджер схемы
-        print("[3/3] Инициализация менеджера схемы...")
+        # 3. Инициализируем менеджер схемы и СОЗДАЕМ ТАБЛИЦЫ
+        print("[3/3] Инициализация менеджера схемы и создание таблиц...")
         self.schema_manager = DatabaseSchemaManager(self.connection)
+        self.schema_manager.create_tables()  # ВЫЗОВ МЕТОДА ДЛЯ СОЗДАНИЯ ТАБЛИЦ
 
         print("DatabaseManager успешно инициализирован\n")
 
@@ -175,7 +180,7 @@ class DatabaseManager:
         """Добавление работодателя в БД"""
         query = """
             INSERT INTO employers (
-                employer_id, name, description, site_url, 
+                employer_id, name, description, site_url,
                 alternate_url, logo_urls, area, industries
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (employer_id) DO NOTHING
@@ -293,7 +298,7 @@ class DatabaseManager:
             if i % 50 == 0:
                 print(f"Загружено вакансий: {i}/{stats['vacancies_total']}")
 
-        print(f"\nЗагрузка завершена!")
+        print("\nЗагрузка завершена!")
         print(f"Успешно загружено: {stats['employers_loaded']} работодателей и {stats['vacancies_loaded']} вакансий")
 
         return stats

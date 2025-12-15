@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, cast
 
 from src.api_client import HeadHunterAPIClient
 from src.config import DatabaseConfig
@@ -89,11 +89,8 @@ def load_data_to_database(json_file: str) -> bool:
     print(f"✓ Конфигурация загружена: {config.host}:{config.port}/{config.dbname}")
 
     try:
-        # Инициализация менеджера БД (включает создание БД и подключение)
+        # Инициализация менеджера БД
         db_manager = DatabaseManager(config)
-
-        # Создание таблиц
-        db_manager.schema_manager.create_tables()
 
         # Загрузка данных из JSON
         print(f"\n2. Загрузка данных из файла: {json_file}")
@@ -121,7 +118,7 @@ def load_data_to_database(json_file: str) -> bool:
         print(f"✓ Найдено: {len(employers)} работодателей и {len(vacancies)} вакансий")
 
         # Подтверждение загрузки
-        confirm = input(f"\nЗагрузить данные в БД? (y/n): ").strip().lower()
+        confirm = input("\nЗагрузить данные в БД? (y/n): ").strip().lower()
         if confirm != 'y':
             print("✗ Отменено пользователем")
             db_manager.close()
@@ -352,9 +349,7 @@ def execute_queries():
 
 def main_loop():
     """Главный цикл программы"""
-    print("=" * 60)
-    print("ПРОГРАММА ДЛЯ РАБОТЫ С ВАКАНСИЯМИ HEADHUNTER")
-    print("=" * 60)
+    print("\nБаза данных инициализирована. Можете начинать работу.")
 
     while True:
         choice = show_main_menu()

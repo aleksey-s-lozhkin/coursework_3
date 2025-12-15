@@ -1,8 +1,9 @@
-import requests
 import json
 import os
 import time
-from typing import List, Dict, Any, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
+
+import requests
 
 
 class HTTPRequestHandler:
@@ -10,12 +11,11 @@ class HTTPRequestHandler:
 
     def __init__(self):
         self.__base_url = 'https://api.hh.ru/'
-        self.__headers = {
-            'User-Agent': 'CW3/1.0 (aleksey.s.lozhkin@gmail.com.com)',
-            'Accept': 'application/json'
-        }
+        self.__headers = {'User-Agent': 'CW3/1.0 (aleksey.s.lozhkin@gmail.com.com)', 'Accept': 'application/json'}
 
-    def make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+    def make_request(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """Выполняет HTTP запрос и возвращает JSON"""
         if params is None:
             params = {}
@@ -31,7 +31,7 @@ class HTTPRequestHandler:
                 400: "Неверные параметры запроса",
                 403: "Доступ запрещен",
                 404: "Ресурс не найден",
-                500: "Ошибка сервера"
+                500: "Ошибка сервера",
             }
             status_code = e.response.status_code
             message = error_messages.get(status_code, f'HTTP ошибка {status_code}')
@@ -106,11 +106,7 @@ class HeadHunterAPIClient:
 
         while page < pages:
             try:
-                params = {
-                    "employer_id": employer_id,
-                    "page": page,
-                    "per_page": per_page
-                }
+                params = {"employer_id": employer_id, "page": page, "per_page": per_page}
 
                 data = self._request_handler.make_request("vacancies", params)
                 if isinstance(data, dict) and 'items' in data:
@@ -143,7 +139,7 @@ class HeadHunterAPIClient:
                 company_data: Dict[str, Any] = {
                     'employer': employer_info,
                     'vacancies': vacancies,
-                    'vacancies_count': len(vacancies)
+                    'vacancies_count': len(vacancies),
                 }
 
                 companies_data.append(company_data)
@@ -178,12 +174,11 @@ class HeadHunterAPIClient:
                 'total_companies': len(companies_data),
                 'total_employers': len(all_employers),
                 'total_vacancies': len(all_vacancies),
-                'saved_at': time.strftime('%Y-%m-%d %H:%M:%S')
-            }
+                'saved_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            },
         }
 
         print(f"Сохранено: {len(all_employers)} работодателей, {len(all_vacancies)} вакансий")
 
         result: bool = self._data_saver.save_to_json(data_to_save, filename)
         return result
-
