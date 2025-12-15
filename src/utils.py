@@ -60,7 +60,7 @@ def collect_data_from_hh() -> Optional[str]:
 
             json.dump(formatted_data, f, ensure_ascii=False, indent=2)
 
-        print(f"✓ Данные успешно сохранены в файл: {output_file}")
+        print(f"Данные успешно сохранены в файл: {output_file}")
         print(f"   Найдено: {len(employers_list)} работодателей")
         print(f"   Найдено: {len(vacancies_list)} вакансий")
 
@@ -98,11 +98,11 @@ def load_data_to_database(json_file: str) -> bool:
         try:
             data_source = JSONDataSource(json_file)
         except FileNotFoundError:
-            print(f"✗ Файл {json_file} не найден!")
+            print(f"Файл {json_file} не найден!")
             db_manager.close()
             return False
         except Exception as e:
-            print(f"✗ Ошибка при чтении файла {json_file}: {e}")
+            print(f"Ошибка при чтении файла {json_file}: {e}")
             db_manager.close()
             return False
 
@@ -111,7 +111,7 @@ def load_data_to_database(json_file: str) -> bool:
         vacancies = data_source.get_vacancies()
 
         if not employers and not vacancies:
-            print(f"✗ Файл {json_file} не содержит данных или имеет неверный формат")
+            print(f"Файл {json_file} не содержит данных или имеет неверный формат")
             db_manager.close()
             return False
 
@@ -120,7 +120,7 @@ def load_data_to_database(json_file: str) -> bool:
         # Подтверждение загрузки
         confirm = input("\nЗагрузить данные в БД? (y/n): ").strip().lower()
         if confirm != 'y':
-            print("✗ Отменено пользователем")
+            print("Отменено пользователем")
             db_manager.close()
             return False
 
@@ -136,10 +136,10 @@ def load_data_to_database(json_file: str) -> bool:
         print(f"Вакансии:     {stats['vacancies_loaded']}/{stats['vacancies_total']}")
 
         if stats['employers_loaded'] < stats['employers_total']:
-            print(f"\n⚠  Пропущено работодателей: {stats['employers_total'] - stats['employers_loaded']} (дубликаты)")
+            print(f"\nПропущено работодателей: {stats['employers_total'] - stats['employers_loaded']} (дубликаты)")
         if stats['vacancies_loaded'] < stats['vacancies_total']:
             print(
-                f"⚠  Пропущено вакансий: {stats['vacancies_total'] - stats['vacancies_loaded']} (дубликаты или ошибки)"
+                f"Пропущено вакансий: {stats['vacancies_total'] - stats['vacancies_loaded']} (дубликаты или ошибки)"
             )
 
         print(f"\n✓ Данные успешно загружены в базу данных '{config.dbname}'")
